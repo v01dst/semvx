@@ -144,10 +144,15 @@ def to_dict(version):
     }
 
 
-def read_versions(args, stdin_text=None):
+def read_versions(args, opts=None, stdin_text=None):
     """Versions from the command line, a file, or stdin."""
+    opts = opts or {}
     if args:
         return list(args)
+    path = opts.get("file")
+    if path:
+        with open(path, "r", encoding="utf-8") as handle:
+            stdin_text = handle.read()
     if stdin_text is None:
         stdin_text = sys.stdin.read()
     found = []
@@ -156,6 +161,18 @@ def read_versions(args, stdin_text=None):
             if part:
                 found.append(part)
     return found
+
+
+def split_versions(texts):
+    """Split texts into valid versions and the ones that failed to parse."""
+    good = []
+    bad = []
+    for text in texts:
+        try:
+            good.append(Version.parse(text))
+        except InvalidVersion:
+            bad.append(text)
+    return good, bad
 
 
 def cmd_parse(args, opts):
@@ -170,7 +187,7 @@ def cmd_parse(args, opts):
 
 
 def cmd_validate(args, opts):
-    versions = read_versions(args)
+    versions = read_versions(args, opts)
     bad = []
     for text in versions:
         if not is_valid(text):
@@ -180,6 +197,36 @@ def cmd_validate(args, opts):
     else:
         for text in versions:
             print("%s\t%s" % (text, "valid" if is_valid(text) else "invalid"))
+    return 1 if bad else 0
+
+
+def cmd_sort(args, opts):
+    versions = read_versions(args, opts)
+    good, bad = split_versions(versions)
+    for text in bad:
+        print("not a semantic version: %s" % text, file=sys.stderr)
+    ordered = sorted(good, reverse=bool(opts.get("reverse")))
+    if opts.get("json"):
+        print(json.dumps([str(v) for v in ordered], indent=2))
+    else:
+        for version in ordered:
+            print(version)
+    return 1 if bad else 0
+
+
+def cmd_latest(args, opts):
+    versions = read_versions(args, opts)
+    good, bad = split_versions(versions)
+    for text in bad:
+        print("not a semantic version: %s" % text, file=sys.stderr)
+    if not good:
+        print("no versions given", file=sys.stderr)
+        return 1
+    newest = max(good)
+    if opts.get("json"):
+        print(json.dumps(to_dict(newest), indent=2))
+    else:
+        print(newest)
     return 1 if bad else 0
 
 
@@ -205,6 +252,8 @@ COMMANDS = {
     "parse": cmd_parse,
     "validate": cmd_validate,
     "compare": cmd_compare,
+    "sort": cmd_sort,
+    "latest": cmd_latest,
 }
 
 
@@ -216,6 +265,8 @@ def main(argv=None):
     for item in argv:
         if item in ("--json", "-j"):
             opts["json"] = True
+        elif item == "--reverse":
+            opts["reverse"] = True
         elif item.startswith("--") and "=" in item:
             key, value = item[2:].split("=", 1)
             opts[key.replace("-", "_")] = value

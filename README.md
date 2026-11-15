@@ -31,6 +31,12 @@ cat versions.txt | semvx validate
 
 # Compare two versions (-1, 0, 1)
 semvx compare 1.2.3 1.2.4
+
+# Sort a list of versions
+semvx sort 1.10.0 1.2.0 1.2.0-rc.1
+
+# Highest version in a list
+semvx latest 1.2.0 1.10.0 1.9.0
 ```
 
 ## License

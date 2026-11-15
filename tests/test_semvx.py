@@ -125,6 +125,31 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(data["relation"], "greater")
         self.assertEqual(data["result"], 1)
 
+    def test_sort_orders_numerically(self):
+        code, output = self.run_main(["sort", "1.10.0", "1.2.0", "1.2.0-rc.1"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.split(), ["1.2.0-rc.1", "1.2.0", "1.10.0"])
+
+    def test_sort_reverse(self):
+        code, output = self.run_main(["sort", "1.2.0", "2.0.0", "--reverse"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.split(), ["2.0.0", "1.2.0"])
+
+    def test_sort_reports_bad_versions(self):
+        code, output = self.run_main(["sort", "1.0.0", "bad"])
+        self.assertEqual(code, 1)
+        self.assertEqual(output.strip(), "1.0.0")
+
+    def test_latest_picks_the_newest(self):
+        code, output = self.run_main(["latest", "1.2.0", "1.10.0", "1.9.0"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "1.10.0")
+
+    def test_latest_skips_prereleases_when_a_release_is_present(self):
+        code, output = self.run_main(["latest", "2.0.0-rc.1", "1.9.0"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "2.0.0-rc.1")
+
 
 if __name__ == "__main__":
     unittest.main()
