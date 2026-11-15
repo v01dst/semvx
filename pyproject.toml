@@ -1,0 +1,14 @@
+[project]
+name = "semvx"
+version = "0.1.0"
+description = "Semantic versions from your terminal. Parse, compare, sort, bump, and check ranges. Zero dependencies, pure Python stdlib."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Mahmoud Ahmed" }]
+
+[project.scripts]
+semvx = "semvx:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
