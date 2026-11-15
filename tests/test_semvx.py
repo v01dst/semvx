@@ -77,6 +77,34 @@ class CompareTest(unittest.TestCase):
         self.assertEqual([str(v) for v in sorted(versions)], ["1.2.0-rc.1", "1.2.0", "1.10.0"])
 
 
+class BumpTest(unittest.TestCase):
+    def test_core_bumps(self):
+        version = Version.parse("1.2.3")
+        self.assertEqual(str(semvx.bump(version, "major")), "2.0.0")
+        self.assertEqual(str(semvx.bump(version, "minor")), "1.3.0")
+        self.assertEqual(str(semvx.bump(version, "patch")), "1.2.4")
+
+    def test_prerelease_bump(self):
+        version = Version.parse("1.2.3-alpha.1")
+        self.assertEqual(str(semvx.bump(version, "pre")), "1.2.3-alpha.2")
+
+    def test_prerelease_bump_from_a_release(self):
+        version = Version.parse("1.2.3")
+        self.assertEqual(str(semvx.bump(version, "pre")), "1.2.4-0")
+
+    def test_prerelease_bump_with_preid(self):
+        version = Version.parse("1.2.3")
+        self.assertEqual(str(semvx.bump(version, "pre", "beta")), "1.2.4-beta.0")
+
+    def test_release_drops_the_prerelease(self):
+        version = Version.parse("1.2.3-rc.1")
+        self.assertEqual(str(semvx.bump(version, "release")), "1.2.3")
+
+    def test_release_without_prerelease_fails(self):
+        with self.assertRaises(semvx.InvalidVersion):
+            semvx.bump(Version.parse("1.2.3"), "release")
+
+
 class CommandTest(unittest.TestCase):
     def run_main(self, argv, stdin=""):
         out = []
@@ -149,6 +177,16 @@ class CommandTest(unittest.TestCase):
         code, output = self.run_main(["latest", "2.0.0-rc.1", "1.9.0"])
         self.assertEqual(code, 0)
         self.assertEqual(output.strip(), "2.0.0-rc.1")
+
+    def test_bump_prints_the_next_version(self):
+        code, output = self.run_main(["bump", "1.2.3", "minor"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "1.3.0")
+
+    def test_bump_with_preid(self):
+        code, output = self.run_main(["bump", "1.2.3", "pre", "--preid=rc"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "1.2.4-rc.0")
 
 
 if __name__ == "__main__":

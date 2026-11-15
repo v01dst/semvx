@@ -37,6 +37,11 @@ semvx sort 1.10.0 1.2.0 1.2.0-rc.1
 
 # Highest version in a list
 semvx latest 1.2.0 1.10.0 1.9.0
+
+# Next version
+semvx bump 1.2.3 minor       # 1.3.0
+semvx bump 1.2.3 pre         # 1.2.4-0
+semvx bump 1.2.4-rc.1 release # 1.2.4
 ```
 
 ## License

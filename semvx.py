@@ -248,12 +248,50 @@ def cmd_compare(args, opts):
     return 0
 
 
+def bump(version, part, preid=None):
+    """The next version after the given bump."""
+    if part == "major":
+        return Version(version.major + 1, 0, 0)
+    if part == "minor":
+        return Version(version.major, version.minor + 1, 0)
+    if part == "patch":
+        return Version(version.major, version.minor, version.patch + 1)
+    if part == "pre":
+        if version.prerelease:
+            ids = list(version.prerelease)
+            if ids[-1].isdigit():
+                ids[-1] = str(int(ids[-1]) + 1)
+            else:
+                ids.append("0")
+            return Version(version.major, version.minor, version.patch, ids)
+        tag = [preid, "0"] if preid else ["0"]
+        return Version(version.major, version.minor, version.patch + 1, tag)
+    if part == "release":
+        if not version.prerelease:
+            raise InvalidVersion("%s has no prerelease to release" % version)
+        return Version(version.major, version.minor, version.patch)
+    raise InvalidVersion("unknown bump: %s" % part)
+
+
+def cmd_bump(args, opts):
+    if len(args) != 2:
+        raise SystemExit("bump needs a version and a part")
+    version = Version.parse(args[0])
+    result = bump(version, args[1], opts.get("preid"))
+    if opts.get("json"):
+        print(json.dumps(to_dict(result), indent=2))
+    else:
+        print(result)
+    return 0
+
+
 COMMANDS = {
     "parse": cmd_parse,
     "validate": cmd_validate,
     "compare": cmd_compare,
     "sort": cmd_sort,
     "latest": cmd_latest,
+    "bump": cmd_bump,
 }
 
 
