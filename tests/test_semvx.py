@@ -218,6 +218,17 @@ class CommandTest(unittest.TestCase):
         code, _ = self.run_main(["nope"])
         self.assertEqual(code, 2)
 
+    def test_help_lists_the_commands(self):
+        code, output = self.run_main(["--help"])
+        self.assertEqual(code, 0)
+        for name in semvx.COMMANDS:
+            self.assertIn(name, output)
+
+    def test_version_flag(self):
+        code, output = self.run_main(["--version"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), semvx.VERSION)
+
     def test_compare_prints_number(self):
         code, output = self.run_main(["compare", "1.2.3", "1.2.4"])
         self.assertEqual(code, 0)

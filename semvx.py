@@ -533,6 +533,50 @@ COMMANDS = {
     "filter": cmd_filter,
 }
 
+DESCRIPTIONS = {
+    "parse": "parse a version and print it back",
+    "validate": "report whether each version is valid",
+    "compare": "compare two versions (-1, 0, 1)",
+    "sort": "sort versions by semver precedence",
+    "latest": "print the highest version of a list",
+    "bump": "print the next major, minor, patch or prerelease",
+    "satisfies": "check a version against a range",
+    "diff": "say what changed between two versions",
+    "filter": "keep the versions that fall inside a range",
+}
+
+USAGE = {
+    "parse": "semvx parse VERSION [--json]",
+    "validate": "semvx validate [VERSION...] [--file PATH] [--json]",
+    "compare": "semvx compare VERSION VERSION [--json]",
+    "sort": "semvx sort [VERSION...] [--file PATH] [--reverse] [--json]",
+    "latest": "semvx latest [VERSION...] [--file PATH] [--json]",
+    "bump": "semvx bump VERSION major|minor|patch|pre|release [--preid TAG] [--json]",
+    "satisfies": "semvx satisfies VERSION RANGE [--json]",
+    "diff": "semvx diff VERSION VERSION [--json]",
+    "filter": "semvx filter RANGE [VERSION...] [--file PATH] [--json]",
+}
+
+VERSION = "0.1.0"
+
+
+def print_help():
+    print("semvx %s - semantic versions from your terminal" % VERSION)
+    print()
+    print("usage: semvx <command> [args]")
+    print()
+    print("commands:")
+    for name in sorted(COMMANDS):
+        print("  %-10s %s" % (name, DESCRIPTIONS[name]))
+    print()
+    print("options:")
+    print("  --json      print JSON instead of plain text")
+    print("  --file      read versions from a file")
+    print("  --reverse   sort from newest to oldest")
+    print("  --preid     tag used by the pre bump")
+    print("  --help      show this text")
+    print("  --version   show the version")
+
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -544,6 +588,12 @@ def main(argv=None):
             opts["json"] = True
         elif item == "--reverse":
             opts["reverse"] = True
+        elif item in ("--help", "-h"):
+            print_help()
+            return 0
+        elif item == "--version":
+            print(VERSION)
+            return 0
         elif item.startswith("--") and "=" in item:
             key, value = item[2:].split("=", 1)
             opts[key.replace("-", "_")] = value
@@ -552,8 +602,9 @@ def main(argv=None):
         else:
             args.append(item)
     if not command or command not in COMMANDS:
-        names = ", ".join(sorted(COMMANDS))
-        print("usage: semvx <command> [args]\n\ncommands: %s" % names, file=sys.stderr)
+        if command:
+            print("unknown command: %s" % command, file=sys.stderr)
+        print_help()
         return 2
     try:
         return COMMANDS[command](args, opts)
