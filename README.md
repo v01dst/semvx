@@ -14,6 +14,22 @@ Or run directly:
 python semvx.py --help
 ```
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `parse` | read a version and print it back |
+| `validate` | report whether each version is valid |
+| `compare` | order two versions (`-1`, `0`, `1`) |
+| `sort` | sort versions by semver precedence |
+| `latest` | print the highest version of a list |
+| `bump` | the next major, minor, patch, prerelease or release |
+| `satisfies` | check a version against a range |
+| `diff` | what changed between two versions |
+| `filter` | keep the versions that fall inside a range |
+
+Every command takes `--json` for machine-readable output.
+
 ## Usage
 
 ```bash
