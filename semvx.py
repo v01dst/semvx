@@ -436,6 +436,54 @@ def cmd_satisfies(args, opts):
     return 0 if result else 1
 
 
+def change_kind(left, right):
+    """What changed between two versions: major, minor, patch, prerelease or none."""
+    if left.major != right.major:
+        return "major"
+    if left.minor != right.minor:
+        return "minor"
+    if left.patch != right.patch:
+        return "patch"
+    if left.prerelease != right.prerelease:
+        return "prerelease"
+    return "none"
+
+
+def cmd_diff(args, opts):
+    if len(args) != 2:
+        raise SystemExit("diff needs two versions")
+    left = Version.parse(args[0])
+    right = Version.parse(args[1])
+    kind = change_kind(left, right)
+    if opts.get("json"):
+        print(json.dumps({
+            "from": str(left),
+            "to": str(right),
+            "change": kind,
+            "direction": "up" if compare(left, right) < 0 else ("down" if compare(left, right) > 0 else "same"),
+        }, indent=2))
+    else:
+        print(kind)
+    return 0
+
+
+def cmd_filter(args, opts):
+    if not args:
+        raise SystemExit("filter needs a range")
+    range_text = args[0]
+    versions = read_versions(args[1:], opts)
+    good, bad = split_versions(versions)
+    for text in bad:
+        print("not a semantic version: %s" % text, file=sys.stderr)
+    matched = [v for v in good if satisfies(v, range_text)]
+    if opts.get("json"):
+        print(json.dumps([str(v) for v in matched], indent=2))
+    else:
+        for version in matched:
+            print(version)
+    return 1 if bad else 0
+
+
 def bump(version, part, preid=None):
     """The next version after the given bump."""
     if part == "major":
@@ -481,6 +529,8 @@ COMMANDS = {
     "latest": cmd_latest,
     "bump": cmd_bump,
     "satisfies": cmd_satisfies,
+    "diff": cmd_diff,
+    "filter": cmd_filter,
 }
 
 

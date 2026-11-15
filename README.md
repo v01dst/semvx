@@ -46,6 +46,12 @@ semvx bump 1.2.4-rc.1 release # 1.2.4
 # Does a version fall inside a range?
 semvx satisfies 1.5.0 "^1.2.0"   # yes
 semvx satisfies 2.0.0 "^1.2.0"   # no
+
+# What changed between two versions
+semvx diff 1.2.3 2.0.0          # major
+
+# Keep only the versions inside a range
+semvx filter "^1.2.0" 1.2.0 2.0.0 1.9.0
 ```
 
 ## Ranges

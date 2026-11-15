@@ -170,6 +170,18 @@ class SatisfiesTest(unittest.TestCase):
         self.check("1.5.0-beta", ">=1.5.0-alpha <2.0.0", True)
 
 
+class DiffTest(unittest.TestCase):
+    def test_change_kinds(self):
+        self.assertEqual(semvx.change_kind(Version.parse("1.0.0"), Version.parse("2.0.0")), "major")
+        self.assertEqual(semvx.change_kind(Version.parse("1.0.0"), Version.parse("1.1.0")), "minor")
+        self.assertEqual(semvx.change_kind(Version.parse("1.0.0"), Version.parse("1.0.1")), "patch")
+        self.assertEqual(semvx.change_kind(Version.parse("1.0.0-a"), Version.parse("1.0.0-b")), "prerelease")
+        self.assertEqual(semvx.change_kind(Version.parse("1.0.0"), Version.parse("1.0.0")), "none")
+
+    def test_build_metadata_is_not_a_change(self):
+        self.assertEqual(semvx.change_kind(Version.parse("1.0.0+a"), Version.parse("1.0.0+b")), "none")
+
+
 class CommandTest(unittest.TestCase):
     def run_main(self, argv, stdin=""):
         out = []
@@ -269,6 +281,28 @@ class CommandTest(unittest.TestCase):
         data = json.loads(output)
         self.assertTrue(data["satisfies"])
         self.assertEqual(data["range"], "^1.2.0")
+
+    def test_diff_prints_the_change(self):
+        code, output = self.run_main(["diff", "1.2.3", "2.0.0"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "major")
+
+    def test_diff_json(self):
+        code, output = self.run_main(["diff", "1.2.3", "1.3.0", "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(output)
+        self.assertEqual(data["change"], "minor")
+        self.assertEqual(data["direction"], "up")
+
+    def test_filter_keeps_matching_versions(self):
+        code, output = self.run_main(["filter", "^1.2.0", "1.2.0", "2.0.0", "1.9.0"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.split(), ["1.2.0", "1.9.0"])
+
+    def test_filter_reads_stdin(self):
+        code, output = self.run_main(["filter", "^1.0.0"], stdin="1.0.0\n2.0.0\n")
+        self.assertEqual(code, 0)
+        self.assertEqual(output.split(), ["1.0.0"])
 
 
 if __name__ == "__main__":
