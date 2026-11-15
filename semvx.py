@@ -248,6 +248,194 @@ def cmd_compare(args, opts):
     return 0
 
 
+XCHARS = ("x", "X", "*")
+OPERATORS = (">=", "<=", ">", "<", "=")
+
+
+class Comparator:
+    """One condition in a range, such as >=1.2.3."""
+
+    __slots__ = ("op", "version")
+
+    def __init__(self, op, version=None):
+        self.op = op
+        self.version = version
+
+    def test(self, version):
+        if self.version is None:
+            return True
+        result = compare(version, self.version)
+        if self.op in ("", "="):
+            return result == 0
+        if self.op == ">=":
+            return result >= 0
+        if self.op == ">":
+            return result > 0
+        if self.op == "<=":
+            return result <= 0
+        if self.op == "<":
+            return result < 0
+        raise InvalidVersion("unknown operator: %s" % self.op)
+
+
+def partial_parts(token):
+    """Split 1.2.x into (1, 2, None); a missing part is None."""
+    parts = token.split(".")
+    out = []
+    for index in range(3):
+        if index < len(parts):
+            piece = parts[index]
+            if piece in XCHARS or piece == "":
+                out.append(None)
+            else:
+                try:
+                    out.append(int(piece))
+                except ValueError:
+                    raise InvalidVersion(token)
+        else:
+            out.append(None)
+    return out
+
+
+def partial_version(parts):
+    return Version(parts[0] or 0, parts[1] or 0, parts[2] or 0)
+
+
+def caret_upper(parts):
+    major, minor, patch = parts
+    if major is None:
+        return Version(0, 0, 0)
+    if major > 0:
+        return Version(major + 1, 0, 0)
+    if minor is None:
+        return Version(1, 0, 0)
+    if minor > 0:
+        return Version(0, minor + 1, 0)
+    if patch is None:
+        return Version(0, 1, 0)
+    if patch > 0:
+        return Version(0, 0, patch + 1)
+    return Version(0, 0, 1)
+
+
+def tilde_upper(parts):
+    major, minor, patch = parts
+    if major is None:
+        return Version(0, 0, 0)
+    if minor is None:
+        return Version(major + 1, 0, 0)
+    return Version(major, minor + 1, 0)
+
+
+def xrange_upper(parts):
+    major, minor, patch = parts
+    if major is None:
+        return Version(0, 0, 0)
+    if minor is None:
+        return Version(major + 1, 0, 0)
+    return Version(major, minor + 1, 0)
+
+
+def parse_token(token):
+    """Turn one range token into a list of comparators."""
+    op = ""
+    rest = token
+    for candidate in OPERATORS:
+        if rest.startswith(candidate):
+            op = candidate
+            rest = rest[len(candidate):]
+            break
+    mode = ""
+    if rest.startswith("^"):
+        mode = "caret"
+        rest = rest[1:]
+    elif rest.startswith("~"):
+        mode = "tilde"
+        rest = rest[1:]
+    if rest in XCHARS:
+        return [Comparator("*", None)]
+    if "-" in rest or "+" in rest:
+        version = Version.parse(rest)
+        return [Comparator(op or "=", version)]
+    parts = partial_parts(rest)
+    lower = partial_version(parts)
+    if mode == "caret":
+        return [Comparator(">=", lower), Comparator("<", caret_upper(parts))]
+    if mode == "tilde":
+        return [Comparator(">=", lower), Comparator("<", tilde_upper(parts))]
+    if parts[2] is None:
+        if op in ("", "="):
+            return [Comparator(">=", lower), Comparator("<", xrange_upper(parts))]
+        if op == ">=":
+            return [Comparator(">=", lower)]
+        if op == ">":
+            return [Comparator(">=", xrange_upper(parts))]
+        if op == "<=":
+            return [Comparator("<", xrange_upper(parts))]
+        if op == "<":
+            return [Comparator("<", lower)]
+    return [Comparator(op or "=", lower)]
+
+
+def parse_range(text):
+    """A range is a list of comparator sets, one per || branch."""
+    raw = str(text).strip()
+    if raw == "" or raw in XCHARS:
+        return [[Comparator("*", None)]]
+    sets = []
+    for branch in raw.split("||"):
+        branch = branch.strip()
+        if " - " in branch:
+            sets.append(parse_hyphen(branch))
+        else:
+            comparators = []
+            for token in branch.split():
+                comparators.extend(parse_token(token))
+            sets.append(comparators)
+    return sets
+
+
+def parse_hyphen(branch):
+    left, right = branch.split(" - ", 1)
+    comparators = [Comparator(">=", partial_version(partial_parts(left.strip())))]
+    right_parts = partial_parts(right.strip())
+    if right_parts[2] is None:
+        comparators.append(Comparator("<", xrange_upper(right_parts)))
+    else:
+        comparators.append(Comparator("<=", partial_version(right_parts)))
+    return comparators
+
+
+def satisfies(version, range_text):
+    """True when the version falls inside the range."""
+    for comparators in parse_range(range_text):
+        if not all(c.test(version) for c in comparators):
+            continue
+        if not version.prerelease:
+            return True
+        for comparator in comparators:
+            other = comparator.version
+            if other is not None and other.prerelease and other.core() == version.core():
+                return True
+    return False
+
+
+def cmd_satisfies(args, opts):
+    if len(args) != 2:
+        raise SystemExit("satisfies needs a version and a range")
+    version = Version.parse(args[0])
+    result = satisfies(version, args[1])
+    if opts.get("json"):
+        print(json.dumps({
+            "version": str(version),
+            "range": args[1],
+            "satisfies": result,
+        }, indent=2))
+    else:
+        print("yes" if result else "no")
+    return 0 if result else 1
+
+
 def bump(version, part, preid=None):
     """The next version after the given bump."""
     if part == "major":
@@ -292,6 +480,7 @@ COMMANDS = {
     "sort": cmd_sort,
     "latest": cmd_latest,
     "bump": cmd_bump,
+    "satisfies": cmd_satisfies,
 }
 
 

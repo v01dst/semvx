@@ -105,6 +105,71 @@ class BumpTest(unittest.TestCase):
             semvx.bump(Version.parse("1.2.3"), "release")
 
 
+class SatisfiesTest(unittest.TestCase):
+    def check(self, version, range_text, expected):
+        self.assertEqual(semvx.satisfies(Version.parse(version), range_text), expected)
+
+    def test_exact(self):
+        self.check("1.2.3", "1.2.3", True)
+        self.check("1.2.4", "1.2.3", False)
+
+    def test_comparators(self):
+        self.check("1.2.3", ">=1.2.3", True)
+        self.check("1.2.2", ">1.2.3", False)
+        self.check("1.2.3", "<=1.2.3", True)
+        self.check("1.2.3", "<1.2.4", True)
+
+    def test_caret(self):
+        self.check("1.2.3", "^1.2.3", True)
+        self.check("1.9.9", "^1.2.3", True)
+        self.check("2.0.0", "^1.2.3", False)
+        self.check("0.2.9", "^0.2.3", True)
+        self.check("0.3.0", "^0.2.3", False)
+        self.check("0.0.3", "^0.0.3", True)
+        self.check("0.0.4", "^0.0.3", False)
+
+    def test_tilde(self):
+        self.check("1.2.9", "~1.2.3", True)
+        self.check("1.3.0", "~1.2.3", False)
+
+    def test_wildcards(self):
+        self.check("1.2.9", "1.2.x", True)
+        self.check("1.3.0", "1.2.x", False)
+        self.check("1.9.0", "1.x", True)
+        self.check("2.0.0", "1.x", False)
+
+    def test_partial_comparators(self):
+        self.check("1.2.5", ">=1.2", True)
+        self.check("1.1.9", ">=1.2", False)
+        self.check("1.2.5", ">1.2", False)
+        self.check("1.3.0", ">1.2", True)
+        self.check("1.2.5", "<=1.2", True)
+        self.check("1.3.0", "<=1.2", False)
+        self.check("1.1.9", "<1.2", True)
+        self.check("1.2.0", "<1.2", False)
+
+    def test_any(self):
+        self.check("9.9.9", "*", True)
+        self.check("9.9.9", "", True)
+
+    def test_and_ranges(self):
+        self.check("1.5.0", ">=1.2.0 <2.0.0", True)
+        self.check("2.1.0", ">=1.2.0 <2.0.0", False)
+
+    def test_or_ranges(self):
+        self.check("2.1.0", "^1.0.0 || ^2.0.0", True)
+        self.check("3.1.0", "^1.0.0 || ^2.0.0", False)
+
+    def test_hyphen_range(self):
+        self.check("1.5.0", "1.2.0 - 2.0.0", True)
+        self.check("2.0.1", "1.2.0 - 2.0.0", False)
+
+    def test_prerelease_needs_a_matching_comparator(self):
+        self.check("1.5.0-beta", "^1.2.0", False)
+        self.check("1.5.0-beta", ">=1.5.0-alpha", True)
+        self.check("1.5.0-beta", ">=1.5.0-alpha <2.0.0", True)
+
+
 class CommandTest(unittest.TestCase):
     def run_main(self, argv, stdin=""):
         out = []
@@ -187,6 +252,23 @@ class CommandTest(unittest.TestCase):
         code, output = self.run_main(["bump", "1.2.3", "pre", "--preid=rc"])
         self.assertEqual(code, 0)
         self.assertEqual(output.strip(), "1.2.4-rc.0")
+
+    def test_satisfies_prints_yes(self):
+        code, output = self.run_main(["satisfies", "1.5.0", "^1.2.0"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "yes")
+
+    def test_satisfies_prints_no_and_fails(self):
+        code, output = self.run_main(["satisfies", "2.5.0", "^1.2.0"])
+        self.assertEqual(code, 1)
+        self.assertEqual(output.strip(), "no")
+
+    def test_satisfies_json(self):
+        code, output = self.run_main(["satisfies", "1.5.0", "^1.2.0", "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(output)
+        self.assertTrue(data["satisfies"])
+        self.assertEqual(data["range"], "^1.2.0")
 
 
 if __name__ == "__main__":
