@@ -72,6 +72,56 @@ class Version:
     def __hash__(self):
         return hash((self.core(), self.prerelease))
 
+    def __lt__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+        return compare(self, other) < 0
+
+    def __le__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+        return compare(self, other) <= 0
+
+    def __gt__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+        return compare(self, other) > 0
+
+    def __ge__(self, other):
+        if not isinstance(other, Version):
+            return NotImplemented
+        return compare(self, other) >= 0
+
+
+def compare_prerelease(left, right):
+    """Order two prerelease identifier tuples."""
+    if not left and not right:
+        return 0
+    if not left:
+        return 1
+    if not right:
+        return -1
+    for a, b in zip(left, right):
+        a_num = a.isdigit()
+        b_num = b.isdigit()
+        if a_num and b_num:
+            if int(a) != int(b):
+                return -1 if int(a) < int(b) else 1
+        elif a_num != b_num:
+            return -1 if a_num else 1
+        elif a != b:
+            return -1 if a < b else 1
+    if len(left) == len(right):
+        return 0
+    return -1 if len(left) < len(right) else 1
+
+
+def compare(left, right):
+    """-1 when left is older, 0 when equal, 1 when left is newer."""
+    if left.core() != right.core():
+        return -1 if left.core() < right.core() else 1
+    return compare_prerelease(left.prerelease, right.prerelease)
+
 
 def is_valid(text):
     """True when text is a valid semantic version."""
@@ -133,9 +183,28 @@ def cmd_validate(args, opts):
     return 1 if bad else 0
 
 
+def cmd_compare(args, opts):
+    if len(args) != 2:
+        raise SystemExit("compare needs two versions")
+    left = Version.parse(args[0])
+    right = Version.parse(args[1])
+    result = compare(left, right)
+    if opts.get("json"):
+        print(json.dumps({
+            "left": str(left),
+            "right": str(right),
+            "result": result,
+            "relation": "greater" if result > 0 else ("less" if result < 0 else "equal"),
+        }, indent=2))
+    else:
+        print(result)
+    return 0
+
+
 COMMANDS = {
     "parse": cmd_parse,
     "validate": cmd_validate,
+    "compare": cmd_compare,
 }
 
 

@@ -53,6 +53,30 @@ class ValidateTest(unittest.TestCase):
         self.assertTrue(is_valid("1.0.0-0.3.7"))
 
 
+class CompareTest(unittest.TestCase):
+    def test_core_order(self):
+        self.assertEqual(semvx.compare(Version.parse("1.0.0"), Version.parse("2.0.0")), -1)
+        self.assertEqual(semvx.compare(Version.parse("2.0.0"), Version.parse("1.0.0")), 1)
+        self.assertEqual(semvx.compare(Version.parse("1.2.3"), Version.parse("1.2.3")), 0)
+
+    def test_prerelease_is_older(self):
+        self.assertEqual(semvx.compare(Version.parse("1.0.0-alpha"), Version.parse("1.0.0")), -1)
+        self.assertEqual(semvx.compare(Version.parse("1.0.0"), Version.parse("1.0.0-alpha")), 1)
+
+    def test_prerelease_identifiers(self):
+        self.assertEqual(semvx.compare(Version.parse("1.0.0-alpha"), Version.parse("1.0.0-beta")), -1)
+        self.assertEqual(semvx.compare(Version.parse("1.0.0-1"), Version.parse("1.0.0-alpha")), -1)
+        self.assertEqual(semvx.compare(Version.parse("1.0.0-alpha.1"), Version.parse("1.0.0-alpha.2")), -1)
+        self.assertEqual(semvx.compare(Version.parse("1.0.0-alpha"), Version.parse("1.0.0-alpha.1")), -1)
+
+    def test_build_metadata_is_ignored(self):
+        self.assertEqual(semvx.compare(Version.parse("1.0.0+a"), Version.parse("1.0.0+b")), 0)
+
+    def test_sorted_uses_comparison(self):
+        versions = [Version.parse(v) for v in ("1.10.0", "1.2.0", "1.2.0-rc.1")]
+        self.assertEqual([str(v) for v in sorted(versions)], ["1.2.0-rc.1", "1.2.0", "1.10.0"])
+
+
 class CommandTest(unittest.TestCase):
     def run_main(self, argv, stdin=""):
         out = []
@@ -88,6 +112,18 @@ class CommandTest(unittest.TestCase):
     def test_unknown_command(self):
         code, _ = self.run_main(["nope"])
         self.assertEqual(code, 2)
+
+    def test_compare_prints_number(self):
+        code, output = self.run_main(["compare", "1.2.3", "1.2.4"])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.strip(), "-1")
+
+    def test_compare_json(self):
+        code, output = self.run_main(["compare", "2.0.0", "1.0.0", "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(output)
+        self.assertEqual(data["relation"], "greater")
+        self.assertEqual(data["result"], 1)
 
 
 if __name__ == "__main__":

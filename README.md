@@ -28,6 +28,9 @@ semvx validate 1.2.3 2.0.0 broken
 
 # Read versions from stdin
 cat versions.txt | semvx validate
+
+# Compare two versions (-1, 0, 1)
+semvx compare 1.2.3 1.2.4
 ```
 
 ## License
